@@ -24,7 +24,15 @@ jobs:
       # following lines. This would typically be used to fail a deployment.
       # We do not recommend to use this in a pull request. Prefer using pull request
       # decoration instead.
-      - uses: sonarsource/sonarqube-quality-gate-action@master
-        timeout-minutes: 5
+      #- uses: sonarsource/sonarqube-quality-gate-action@master
+      #  timeout-minutes: 5
+      #  env:
+      #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Run Quality Gate Script
+        run: |
+           chmod +x ./.github/scripts/quality-gate.sh
+           ./.github/scripts/quality-gate.sh
+        shell: bash
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
