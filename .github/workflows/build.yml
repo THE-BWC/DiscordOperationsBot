@@ -30,8 +30,8 @@ jobs:
       #    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       - name: Run Quality Gate Script
         run: |
-           chmod +x ./.github/scripts/quality-gate.sh
-           ./.github/scripts/quality-gate.sh
+           chmod +x .github/scripts/quality-gate.sh
+           .github/scripts/quality-gate.sh
         shell: bash
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
