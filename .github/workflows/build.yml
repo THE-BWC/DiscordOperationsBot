@@ -1,4 +1,4 @@
-name: SonarQube
+name: Build
 
 on:
   # Trigger analysis when pushing in main or pull requests, and when creating
