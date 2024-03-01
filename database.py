@@ -1,5 +1,5 @@
 import settings
-from peewee import Model, MySQLDatabase, IntegerField, CharField, BooleanField, DateTimeField
+from peewee import Model, MySQLDatabase, IntegerField, CharField, BooleanField, DateTimeField, ForeignKeyField
 
 
 xenforo = MySQLDatabase(
@@ -10,6 +10,14 @@ xenforo = MySQLDatabase(
     port=int(settings.XENFORO_DB_PORT)
 )
 
+# TODO: need to set the correct table_name override and complete with other relevant fields
+class User(Model):
+    id = IntegerField(primary_key=True)
+    name = CharField()
+
+    class Meta:
+        database = xenforo
+
 
 class Operation(Model):
     operation_id = IntegerField(primary_key=True)
@@ -18,7 +26,7 @@ class Operation(Model):
     type_id = IntegerField()
     date_start = DateTimeField()
     date_end = DateTimeField()
-    leader_user_id = IntegerField()
+    leader_user_id = ForeignKeyField(User)
     game_id = IntegerField()
     is_opsec = BooleanField()
 
