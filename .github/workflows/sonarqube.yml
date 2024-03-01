@@ -9,7 +9,6 @@ on:
 
 jobs:
   sonarqube:
-    name: Build
     runs-on: ubuntu-latest
     permissions: read-all
     steps:
