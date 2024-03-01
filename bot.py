@@ -49,7 +49,6 @@ class DiscordBot(discord.Client):
         self.status_task.start()
         self.database = database
         await self.create_operation_embed()
-        await self.send_30minutes_notification_task()
 
     async def send_upcoming_ops(self):
         await self.send_operations("OPSEC Operations", self.where_upcoming_opsec_ops)
