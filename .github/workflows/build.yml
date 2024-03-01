@@ -1,6 +1,8 @@
 name: Build
 
 on:
+  # Trigger analysis when pushing in main or pull requests, and when creating
+  # a pull request. 
   push:
     branches:
       - main
@@ -8,29 +10,26 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  build:
-    name: Build
+  sonarqube:
     runs-on: ubuntu-latest
-    permissions: read-all
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          # Disabling shallow clone is recommended for improving relevancy of reporting.
+          fetch-depth: 0
+
+      # Triggering SonarQube analysis as results of it are required by Quality Gate check.
       - uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: |
-            -Dsonar.verbose=true
-      - name: SonarQube Quality Gate Check Action
-        # You may pin to the exact commit or the version.
-        # uses: OpsVerseIO/sonarqube-quality-gate-action@8f6a11a2589f300283bff3722e8fa07b087bb1b0
-        uses: OpsVerseIO/sonarqube-quality-gate-action@0.3.0-ALPHA-2
+      
+      # Check the Quality Gate status.
+      - name: SonarQube Quality Gate check
+        id: sonarqube-quality-gate-check
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        # Force to fail step after specific time.
+        timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }} #OPTIONAL
-          SET_SONAR_PROJECT_STATUS: true 
-        with:
-          # Location of the scanner metadata report file
-          scanMetadataReportFile: .scannerwork/report-task.txt
