@@ -35,7 +35,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: pylint-report
-          path: .scannerwork/pylint-report.txt
+          path: ./pylint-report.txt
 
   sonarqube:
     needs: pylint
@@ -49,6 +49,7 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: pylint-report
+          path: .scannerwork/pylint-report.txt
 
       - uses: sonarsource/sonarqube-scan-action@master
         env:
