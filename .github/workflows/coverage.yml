@@ -35,7 +35,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: pylint-report
-          path: ./pylint-report.txt
+          path: .scannerwork/pylint-report.txt
 
   sonarqube:
     needs: pylint
@@ -49,7 +49,7 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: pylint-report
-          
+
       - uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
