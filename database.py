@@ -13,22 +13,24 @@ xenforo = MySQLDatabase(
 bot = SqliteDatabase(settings.BOT_DB_NAME)
 
 
-# TODO: need to set the correct table_name override and complete with other relevant fields
 class User(Model):
-    id = IntegerField(primary_key=True)
-    name = CharField()
+    user_id = IntegerField(primary_key=True)
+    username = CharField()
 
     class Meta:
         database = xenforo
+        table_name = "xf_user"
 
 
-# TODO: Set correct values based on existing db
 class Game(Model):
-    id = IntegerField(primary_key=True)
-    name = CharField()
+    game_id = IntegerField(primary_key=True)
+    tag = CharField()
+    game_name = CharField()
+    retired = BooleanField()
 
     class Meta:
         database = xenforo
+        table_name = "opserv_games"
 
 
 class Operation(Model):

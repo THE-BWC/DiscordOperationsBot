@@ -52,11 +52,11 @@ class DiscordBot(discord.Client):
         self.database = database
         await self.send_upcoming_ops()
 
-    async def send_upcoming_ops(self):
+    async def send_upcoming_ops(self) -> None:
         await self.send_operations("OPSEC Operations", self.where_upcoming_opsec_ops)
 
     @staticmethod
-    def where_upcoming_opsec_ops(operation_model: database.Operation, game: int):
+    def where_upcoming_opsec_ops(operation_model: database.Operation, game: int) -> List[bool]:
         return [
             operation_model.game_id == game,
             operation_model.is_opsec == True,
@@ -64,10 +64,11 @@ class DiscordBot(discord.Client):
         ]
 
     @tasks.loop(minutes=3)
-    async def send_30minutes_notification_task(self):
+    async def send_30minutes_notification_task(self) -> None:
         # Get already notified data so that we can filter those out
         notification_model = database.Notification30
-        future_ops = notification_model.select(notification_model.operation_id).where(notification_model.date_start >= datetime.datetime.now())
+        future_ops = notification_model.select(notification_model.operation_id) \
+            .where(notification_model.date_start >= datetime.datetime.now())
         future_ops_ids = list(map(lambda op: op.operation_id, future_ops))
         operations = await self.send_operations("Operations starting in 30 minutes!",
                                                 self.where_ops_30minutes,
@@ -81,10 +82,10 @@ class DiscordBot(discord.Client):
                 op_data.append({'operation_id': op.operation_id, 'date_start': op.date_start})
 
             with self.database.bot.atomic():
-                notification_model.insert_many(op_data).execute()
+                notification_model.insert_many(op_data).execute(self.database.bot)
 
     @staticmethod
-    def where_ops_30minutes(operation_model: database.Operation, game: int):
+    def where_ops_30minutes(operation_model: database.Operation, game: int) -> List[bool]:
         """Set of conditions that select records from the Operation model with a specific deadline"""
         # Mindful with boolean conditions here. We cannot use proper "pythonic" conditions like
         # `operation_model.is_complete is False` because it doesn't translate properly in the SQL query
@@ -96,8 +97,6 @@ class DiscordBot(discord.Client):
                 operation_model.is_completed == False,
                 operation_model.date_start.truncate("minute") >= now,
                 operation_model.date_start.truncate("minute") <= deadline]
-
-
 
     async def send_operations(self,
                               embed_title:str,
@@ -118,7 +117,8 @@ class DiscordBot(discord.Client):
                 return
 
             operation_model = database.Operation
-            operations = operation_model.select().where(*conditions(operation_model, game)).order_by(operation_model.date_start)
+            operations = operation_model.select().where(*conditions(operation_model, game)) \
+                .order_by(operation_model.date_start)
 
             if len(exclude_operations) > 0:
                 operations = list(filter(lambda x: x.operation_id not in exclude_operations, operations))
