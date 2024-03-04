@@ -2,7 +2,7 @@ import discord
 import database
 
 
-class OperationMessageOptions(object):
+class OperationMessageOptions:
     """ Options to configure an OperationsEmbed instance """
     def __init__(self, **kwargs) -> None:
         self.color = kwargs.get('color', discord.Color.red())
@@ -36,10 +36,11 @@ class OperationsEmbed:
 
         self.options = notification_options
 
-    def send_operations(self, text_channel: discord.TextChannel, operations: [database.Operation]):
+    async def send_operations(self, text_channel: discord.TextChannel, operations: [database.Operation]) -> None:
         if self.options.include_timestamp:
             # Get current timestamp
-            timestamp = discord.utils.utcnow()  # TODO: Should this be opserv time to make this consistent?
+            # TODO: Should this be opserv time to make this consistent?
+            timestamp = discord.utils.utcnow()
             self.embed.set_footer(text=f"Last updated: {timestamp.strftime('%Y-%m-%d %H:%M')}")
 
         for operation in operations:
@@ -66,4 +67,5 @@ class OperationsEmbed:
                 value='\n'.join(lines),
                 inline=False
             )
-        await text_channel.send(self.embed)
+
+        await text_channel.send(embed=self.embed)

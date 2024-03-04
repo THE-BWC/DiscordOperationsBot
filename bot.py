@@ -11,7 +11,7 @@ import discord
 
 from discord.ext import tasks
 
-from operationMessage import OperationMessageOptions, OperationsEmbed
+from operation_message import OperationMessageOptions, OperationsEmbed
 
 if settings.DISCORD_BOT_TOKEN is None:
     raise ValueError("DISCORD_BOT_TOKEN is not set in the environment variables.")
@@ -102,7 +102,7 @@ class DiscordBot(discord.Client):
                               embed_title:str,
                               conditions: Callable[[database.Operation, int], List[bool]],
                               exclude_operations: List[int] = [],
-                              notification_options: OperationMessageOptions = settings.NOTIFICATION_OPTIONS['UPCOMING_OPS']) -> List[database.Operation]:
+                              notification_options: OperationMessageOptions = settings.NOTIFICATION_OPTIONS['UPCOMING_OPS']) -> List[database.Operation] | None:
         """
         Send operation notifications in a message with the given title.
         :returns Array of operations that were processed
@@ -127,7 +127,7 @@ class DiscordBot(discord.Client):
                 return
 
             embed = OperationsEmbed(embed_title, notification_options)
-            embed.send_operations(text_channel, operations)
+            await embed.send_operations(text_channel, operations)
             operations_notified.extend(operations)
 
         return operations_notified

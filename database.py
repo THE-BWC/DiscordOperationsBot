@@ -1,5 +1,6 @@
+from peewee import Model, MySQLDatabase, IntegerField, CharField, BooleanField, DateTimeField, ForeignKeyField, \
+    SqliteDatabase
 import settings
-from peewee import Model, MySQLDatabase, IntegerField, CharField, BooleanField, DateTimeField, ForeignKeyField, SqliteDatabase
 
 
 xenforo = MySQLDatabase(
@@ -14,6 +15,7 @@ bot = SqliteDatabase(settings.BOT_DB_NAME)
 
 
 class User(Model):
+    """Xenforo user model"""
     user_id = IntegerField(primary_key=True)
     username = CharField()
 
@@ -23,6 +25,7 @@ class User(Model):
 
 
 class Game(Model):
+    """Opserv game model as it currently exists in the opserv_games table"""
     game_id = IntegerField(primary_key=True)
     tag = CharField()
     game_name = CharField()
@@ -34,6 +37,7 @@ class Game(Model):
 
 
 class Operation(Model):
+    """Opserv operation model as it currently exists in the opserv_operations table"""
     operation_id = IntegerField(primary_key=True)
     operation_name = CharField()
     is_completed = BooleanField()
@@ -50,6 +54,7 @@ class Operation(Model):
 
 
 class Notification30(Model):
+    """Notification model for the 30 reminder sent for operations"""
     operation_id = IntegerField(primary_key=True)
     date_start = DateTimeField()
 

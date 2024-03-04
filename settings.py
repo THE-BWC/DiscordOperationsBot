@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-from operationMessage import OperationMessageOptions
+from operation_message import OperationMessageOptions
 
 load_dotenv()
 
