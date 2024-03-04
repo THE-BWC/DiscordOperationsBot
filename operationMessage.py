@@ -2,8 +2,9 @@ import discord
 import database
 
 
-class OperationMessageOptions:
-    def __init__(self, **kwargs):
+class OperationMessageOptions(object):
+    """ Options to configure an OperationsEmbed instance """
+    def __init__(self, **kwargs) -> None:
         self.color = kwargs.get('color', discord.Color.red())
         self.show_leader = kwargs.get('show_leader', True)
         self.show_game = kwargs.get('show_game', True)
@@ -25,8 +26,7 @@ class OperationsEmbed:
     embed: discord.Embed
     options: OperationMessageOptions
 
-    def __init__(self, title: str, operations: [database.Operation],
-                                notification_options: OperationMessageOptions):
+    def __init__(self, title: str, notification_options: OperationMessageOptions):
         """Create the embed to be used by operation messages"""
         self.embed = discord.Embed(
             title=title,
