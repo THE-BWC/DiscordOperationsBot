@@ -11,7 +11,7 @@ import discord
 
 from discord.ext import tasks
 
-from OperationMessageOptions import OperationMessageOptions
+from operationMessage import OperationMessageOptions, OperationsEmbed
 
 if settings.DISCORD_BOT_TOKEN is None:
     raise ValueError("DISCORD_BOT_TOKEN is not set in the environment variables.")
@@ -97,45 +97,7 @@ class DiscordBot(discord.Client):
                 operation_model.date_start.truncate("minute") >= now,
                 operation_model.date_start.truncate("minute") <= deadline]
 
-    def create_operations_embed(self, title: str, operations: [database.Operation], notification_options: OperationMessageOptions):
-        """Create the embed to be used by operation messages"""
-        embed = discord.Embed(
-            title=title,
-            color=notification_options.color,
-            type="rich"
-        )
 
-        if notification_options.include_timestamp:
-            # Get current timestamp
-            timestamp = discord.utils.utcnow() # TODO: Should this be opserv time to make this consistent?
-            embed.set_footer(text=f"Last updated: {timestamp.strftime('%Y-%m-%d %H:%M')}")
-
-        for operation in operations:
-            field_title = operation.operation_name
-            lines = []
-            if notification_options.show_game:
-                lines.append(f"**{operation.game_id.name}**")
-
-            if notification_options.show_leader:
-                lines.append(f"**Leader:** {operation.leader_user_id.name}")
-
-            if notification_options.show_date_start:
-                lines.append(f"**Start:** {operation.date_start}")
-
-            if notification_options.show_date_end:
-                lines.append(f"**End:** {operation.date_end}")
-
-            if notification_options.show_opserv_link:
-                opserv_link = f"https://www.the-bwc.com/opserv/operation.php?id={operation.operation_id}&do=view"
-                lines.append(f"_Go to [Opserv]({opserv_link}) for details_")
-
-            embed.add_field(
-                name=field_title,
-                value='\n'.join(lines),
-                inline=False
-            )
-
-        return embed
 
     async def send_operations(self,
                               embed_title:str,
@@ -164,9 +126,8 @@ class DiscordBot(discord.Client):
             if len(operations) == 0:
                 return
 
-            embed = self.create_operations_embed(embed_title, operations, notification_options)
-
-            await text_channel.send(embed=embed)
+            embed = OperationsEmbed(embed_title, notification_options)
+            embed.send_operations(text_channel, operations)
             operations_notified.extend(operations)
 
         return operations_notified

@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 
+from operationMessage import OperationMessageOptions
+
 load_dotenv()
 
 # Discord bot token
