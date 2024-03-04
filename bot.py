@@ -62,20 +62,34 @@ class DiscordBot(discord.Client):
         ]
 
     async def send_30minutes_notification_task(self):
-        await self.send_operations("Operations starting in 30 minutes!", self.where_ops_30minutes, False)
+        # Get already notified data so that we can filter those out
+        notification_model = database.Notification30
+        future_ops = notification_model.select(notification_model.operation_id).where(notification_model.date_start >= datetime.datetime.now())
+        future_ops_ids = list(map(lambda op: op.operation_id, future_ops))
+        operations = await self.send_operations("Operations starting in 30 minutes!", self.where_ops_30minutes, False, future_ops_ids)
+
+        # Save the data of those operations we notified
+        if operations:
+            op_data = []
+            for op in operations:
+                op_data.append({'operation_id': op.operation_id, 'date_start': op.date_start})
+
+            with self.database.bot.atomic():
+                notification_model.insert_many(op_data).execute()
 
     @staticmethod
     def where_ops_30minutes(operation_model: database.Operation, game: int):
         """Set of conditions that select records from the Operation model with a specific deadline"""
-        # We want to remove seconds and microseconds from the equation for the query to be more flexible
-        deadline = datetime.datetime.now() + datetime.timedelta(minutes=30)
-        deadline = deadline.replace(second=0, microsecond=0)
-
         # Mindful with boolean conditions here. We cannot use proper "pythonic" conditions like
         # `operation_model.is_complete is False` because it doesn't translate properly in the SQL query
+        now = datetime.datetime.now()
+        now = now.replace(second=0, microsecond=0)
+        deadline = now + datetime.timedelta(minutes=30)
+
         return [operation_model.game_id == game,
                 operation_model.is_completed == False,
-                operation_model.date_start.truncate("minute") == deadline]
+                operation_model.date_start.truncate("minute") >= now,
+                operation_model.date_start.truncate("minute") <= deadline]
 
     def create_operations_embed(self, title: str, operations: [database.Operation]):
         """Create the embed to be used by operation messages"""
@@ -86,7 +100,7 @@ class DiscordBot(discord.Client):
         )
 
         for operation in operations:
-            opserv_link = "https://www.the-bwc.com"
+            opserv_link = "https://www.the-bwc.com" #TODO: generate proper opserv link
             field_title = operation.operation_name
             lines = [
                 f"**Leader:** {operation.leader_user_id.name}",
@@ -102,8 +116,13 @@ class DiscordBot(discord.Client):
 
         return embed
 
-    async def send_operations(self, embed_title:str, conditions: Callable[[database.Operation, int], List[bool]], include_timestamp = True):
+    async def send_operations(self, embed_title:str, conditions: Callable[[database.Operation, int], List[bool]], include_timestamp = True, operations_filter: List[int] = []) -> List[database.Operation]:
+        """
+        Send operation notifications in a message with the given title.
+        :returns Array of operations that were processed
+        """
         channels = self.config.OPSEC_CHANNELS_MAP
+        operations_notified = []
         for game, channel in channels.items():
             text_channel = await self.fetch_channel(channel)
 
@@ -112,7 +131,10 @@ class DiscordBot(discord.Client):
                 return
 
             operation_model = database.Operation
-            operations = operation_model.select().where(*conditions(operation_model, game))
+            operations = operation_model.select().where(*conditions(operation_model, game)).order_by(operation_model.date_start)
+
+            if len(operations_filter) > 0:
+                operations = list(filter(lambda x: x.operation_id not in operations_filter, operations))
 
             if len(operations) == 0:
                 return
@@ -123,7 +145,11 @@ class DiscordBot(discord.Client):
                 # Get current timestamp
                 timestamp = discord.utils.utcnow()
                 embed.set_footer(text=f"Last updated: {timestamp}")
-                await text_channel.send(embed=embed)
+
+            await text_channel.send(embed=embed)
+            operations_notified.extend(operations)
+
+        return operations_notified
 
 
 bot = DiscordBot()

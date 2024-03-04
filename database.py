@@ -1,5 +1,5 @@
 import settings
-from peewee import Model, MySQLDatabase, IntegerField, CharField, BooleanField, DateTimeField, ForeignKeyField
+from peewee import Model, MySQLDatabase, IntegerField, CharField, BooleanField, DateTimeField, ForeignKeyField, SqliteDatabase
 
 
 xenforo = MySQLDatabase(
@@ -9,6 +9,9 @@ xenforo = MySQLDatabase(
     host=settings.XENFORO_DB_HOST,
     port=int(settings.XENFORO_DB_PORT)
 )
+
+bot = SqliteDatabase(settings.BOT_DB_NAME)
+
 
 # TODO: need to set the correct table_name override and complete with other relevant fields
 class User(Model):
@@ -33,3 +36,16 @@ class Operation(Model):
     class Meta:
         database = xenforo
         table_name = "opserv_operations"
+
+
+class Notification30(Model):
+    operation_id = IntegerField(primary_key=True)
+    date_start = DateTimeField()
+
+    class Meta:
+        database = bot
+
+
+# Make sure the database exists and the schemas are created
+bot.connect()
+bot.create_tables([Notification30])
