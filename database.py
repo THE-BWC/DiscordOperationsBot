@@ -22,6 +22,15 @@ class User(Model):
         database = xenforo
 
 
+# TODO: Set correct values based on existing db
+class Game(Model):
+    id = IntegerField(primary_key=True)
+    name = CharField()
+
+    class Meta:
+        database = xenforo
+
+
 class Operation(Model):
     operation_id = IntegerField(primary_key=True)
     operation_name = CharField()
@@ -30,7 +39,7 @@ class Operation(Model):
     date_start = DateTimeField()
     date_end = DateTimeField()
     leader_user_id = ForeignKeyField(User)
-    game_id = IntegerField()
+    game_id = ForeignKeyField(Game)
     is_opsec = BooleanField()
 
     class Meta:

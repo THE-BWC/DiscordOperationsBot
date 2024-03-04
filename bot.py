@@ -11,6 +11,7 @@ import discord
 
 from discord.ext import tasks
 
+from OperationMessageOptions import OperationMessageOptions
 
 if settings.DISCORD_BOT_TOKEN is None:
     raise ValueError("DISCORD_BOT_TOKEN is not set in the environment variables.")
@@ -47,8 +48,9 @@ class DiscordBot(discord.Client):
         self.logger.info(f"Running on {platform.system()} {platform.release()} ({os.name})")
         self.logger.info("-------------------")
         self.status_task.start()
+        self.send_30minutes_notification_task.start()
         self.database = database
-        await self.create_operation_embed()
+        await self.send_upcoming_ops()
 
     async def send_upcoming_ops(self):
         await self.send_operations("OPSEC Operations", self.where_upcoming_opsec_ops)
@@ -61,12 +63,16 @@ class DiscordBot(discord.Client):
             operation_model.is_completed == False
         ]
 
+    @tasks.loop(minutes=3)
     async def send_30minutes_notification_task(self):
         # Get already notified data so that we can filter those out
         notification_model = database.Notification30
         future_ops = notification_model.select(notification_model.operation_id).where(notification_model.date_start >= datetime.datetime.now())
         future_ops_ids = list(map(lambda op: op.operation_id, future_ops))
-        operations = await self.send_operations("Operations starting in 30 minutes!", self.where_ops_30minutes, False, future_ops_ids)
+        operations = await self.send_operations("Operations starting in 30 minutes!",
+                                                self.where_ops_30minutes,
+                                                future_ops_ids,
+                                                settings.NOTIFICATION_OPTIONS['30MIN_OPS'])
 
         # Save the data of those operations we notified
         if operations:
@@ -91,22 +97,37 @@ class DiscordBot(discord.Client):
                 operation_model.date_start.truncate("minute") >= now,
                 operation_model.date_start.truncate("minute") <= deadline]
 
-    def create_operations_embed(self, title: str, operations: [database.Operation]):
+    def create_operations_embed(self, title: str, operations: [database.Operation], notification_options: OperationMessageOptions):
         """Create the embed to be used by operation messages"""
         embed = discord.Embed(
             title=title,
-            color=discord.Color.red(),
+            color=notification_options.color,
             type="rich"
         )
 
+        if notification_options.include_timestamp:
+            # Get current timestamp
+            timestamp = discord.utils.utcnow() # TODO: Should this be opserv time to make this consistent?
+            embed.set_footer(text=f"Last updated: {timestamp.strftime('%Y-%m-%d %H:%M')}")
+
         for operation in operations:
-            opserv_link = "https://www.the-bwc.com" #TODO: generate proper opserv link
             field_title = operation.operation_name
-            lines = [
-                f"**Leader:** {operation.leader_user_id.name}",
-                f"**Start:** {operation.date_start}",
-                f"_Go to [Opserv]({opserv_link}) for details_"
-            ]
+            lines = []
+            if notification_options.show_game:
+                lines.append(f"**{operation.game_id.name}**")
+
+            if notification_options.show_leader:
+                lines.append(f"**Leader:** {operation.leader_user_id.name}")
+
+            if notification_options.show_date_start:
+                lines.append(f"**Start:** {operation.date_start}")
+
+            if notification_options.show_date_end:
+                lines.append(f"**End:** {operation.date_end}")
+
+            if notification_options.show_opserv_link:
+                opserv_link = f"https://www.the-bwc.com/opserv/operation.php?id={operation.operation_id}&do=view"
+                lines.append(f"_Go to [Opserv]({opserv_link}) for details_")
 
             embed.add_field(
                 name=field_title,
@@ -116,7 +137,11 @@ class DiscordBot(discord.Client):
 
         return embed
 
-    async def send_operations(self, embed_title:str, conditions: Callable[[database.Operation, int], List[bool]], include_timestamp = True, operations_filter: List[int] = []) -> List[database.Operation]:
+    async def send_operations(self,
+                              embed_title:str,
+                              conditions: Callable[[database.Operation, int], List[bool]],
+                              exclude_operations: List[int] = [],
+                              notification_options: OperationMessageOptions = settings.NOTIFICATION_OPTIONS['UPCOMING_OPS']) -> List[database.Operation]:
         """
         Send operation notifications in a message with the given title.
         :returns Array of operations that were processed
@@ -133,18 +158,13 @@ class DiscordBot(discord.Client):
             operation_model = database.Operation
             operations = operation_model.select().where(*conditions(operation_model, game)).order_by(operation_model.date_start)
 
-            if len(operations_filter) > 0:
-                operations = list(filter(lambda x: x.operation_id not in operations_filter, operations))
+            if len(exclude_operations) > 0:
+                operations = list(filter(lambda x: x.operation_id not in exclude_operations, operations))
 
             if len(operations) == 0:
                 return
 
-            embed = self.create_operations_embed(embed_title, operations)
-
-            if include_timestamp:
-                # Get current timestamp
-                timestamp = discord.utils.utcnow()
-                embed.set_footer(text=f"Last updated: {timestamp}")
+            embed = self.create_operations_embed(embed_title, operations, notification_options)
 
             await text_channel.send(embed=embed)
             operations_notified.extend(operations)
