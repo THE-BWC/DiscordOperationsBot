@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 
-from operation_message import OperationMessageOptions
 
 load_dotenv()
 
@@ -26,8 +25,3 @@ OPSEC_CHANNELS_MAP = {
     "16": "1212157407598223470"
 }
 BOT_DB_NAME = "botdb"
-
-NOTIFICATION_OPTIONS = {
-    'UPCOMING_OPS': OperationMessageOptions(),
-    '30MIN_OPS': OperationMessageOptions(show_game=False, show_date_end=False, include_timestamp=False)
-}

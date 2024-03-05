@@ -26,7 +26,7 @@ class OperationsEmbed:
     embed: discord.Embed
     options: OperationMessageOptions
 
-    def __init__(self, title: str, notification_options: OperationMessageOptions):
+    def __init__(self, title: str, notification_options: OperationMessageOptions) -> None:
         """Create the embed to be used by operation messages"""
         self.embed = discord.Embed(
             title=title,

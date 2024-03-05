@@ -1,15 +1,17 @@
+import collections
 import datetime
 import random
 import platform
 import os
-from typing import Callable, List
+from typing import List
+
+import discord
+from discord.ext import tasks
 
 import settings
-import botLogger
+import notification_settings
+import bot_logger
 import database
-import discord
-
-from discord.ext import tasks
 
 from operation_message import OperationMessageOptions, OperationsEmbed
 
@@ -18,11 +20,11 @@ if settings.DISCORD_BOT_TOKEN is None:
 
 
 class DiscordBot(discord.Client):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             intents=discord.Intents.default()
         )
-        self.logger = botLogger.logger
+        self.logger = bot_logger.logger
         self.config = settings
         self.database = None
 
@@ -42,10 +44,10 @@ class DiscordBot(discord.Client):
         await self.wait_until_ready()
 
     async def setup_hook(self) -> None:
-        self.logger.info(f"Logged in as {self.user.name}")
-        self.logger.info(f"discord.py version: {discord.__version__}")
-        self.logger.info(f"Python version: {platform.python_version()}")
-        self.logger.info(f"Running on {platform.system()} {platform.release()} ({os.name})")
+        self.logger.info("Logged in as %s", self.user.name)
+        self.logger.info("discord.py version: %s", discord.__version__)
+        self.logger.info("Python version: %s", f"{platform.python_version()} ({platform.architecture()[0]})")
+        self.logger.info("Running on %s", f"{platform.system()} {platform.release()} ({os.name})")
         self.logger.info("-------------------")
         self.status_task.start()
         self.send_30minutes_notification_task.start()
@@ -56,7 +58,7 @@ class DiscordBot(discord.Client):
         await self.send_operations("OPSEC Operations", self.where_upcoming_opsec_ops)
 
     @staticmethod
-    def where_upcoming_opsec_ops(operation_model: database.Operation, game: int) -> List[bool]:
+    def where_upcoming_opsec_ops(operation_model: database.Operation, game: int) -> list[bool]:
         return [
             operation_model.game_id == game,
             operation_model.is_opsec == True,
@@ -73,7 +75,7 @@ class DiscordBot(discord.Client):
         operations = await self.send_operations("Operations starting in 30 minutes!",
                                                 self.where_ops_30minutes,
                                                 future_ops_ids,
-                                                settings.NOTIFICATION_OPTIONS['30MIN_OPS'])
+                                                notification_settings.NOTIFICATION_OPTIONS['30MIN_OPS'])
 
         # Save the data of those operations we notified
         if operations:
@@ -85,7 +87,7 @@ class DiscordBot(discord.Client):
                 notification_model.insert_many(op_data).execute(self.database.bot)
 
     @staticmethod
-    def where_ops_30minutes(operation_model: database.Operation, game: int) -> List[bool]:
+    def where_ops_30minutes(operation_model: database.Operation, game: int) -> list[bool]:
         """Set of conditions that select records from the Operation model with a specific deadline"""
         # Mindful with boolean conditions here. We cannot use proper "pythonic" conditions like
         # `operation_model.is_complete is False` because it doesn't translate properly in the SQL query
@@ -98,11 +100,14 @@ class DiscordBot(discord.Client):
                 operation_model.date_start.truncate("minute") >= now,
                 operation_model.date_start.truncate("minute") <= deadline]
 
-    async def send_operations(self,
-                              embed_title:str,
-                              conditions: Callable[[database.Operation, int], List[bool]],
-                              exclude_operations: List[int] = [],
-                              notification_options: OperationMessageOptions = settings.NOTIFICATION_OPTIONS['UPCOMING_OPS']) -> List[database.Operation] | None:
+    async def send_operations(
+            self,
+            embed_title: str,
+            conditions: collections.abc.Callable[[database.Operation, int], list[bool]],
+            exclude_operations: list[int] = [],
+            notification_options: OperationMessageOptions =
+            notification_settings.NOTIFICATION_OPTIONS['UPCOMING_OPS']
+    ) -> List[database.Operation] | None:
         """
         Send operation notifications in a message with the given title.
         :returns Array of operations that were processed
@@ -113,7 +118,7 @@ class DiscordBot(discord.Client):
             text_channel = await self.fetch_channel(channel)
 
             if text_channel is None:
-                self.logger.error(f"Channel {text_channel} not found.")
+                self.logger.error("Channel %s not found.", text_channel)
                 return
 
             operation_model = database.Operation
