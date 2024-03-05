@@ -47,16 +47,16 @@ class OperationsEmbed:
             field_title = operation.operation_name
             lines = []
             if self.options.show_game:
-                lines.append(f"**{operation.game_id.name}**")
+                lines.append(f"**{operation.game_id.game_name}**")
 
             if self.options.show_leader:
-                lines.append(f"**Leader:** {operation.leader_user_id.name}")
+                lines.append(f"**Leader:** {operation.leader_user_id.username}")
 
             if self.options.show_date_start:
-                lines.append(f"**Start:** {operation.date_start}")
+                lines.append(f"**Start:** <t:{operation.date_start}>")
 
             if self.options.show_date_end:
-                lines.append(f"**End:** {operation.date_end}")
+                lines.append(f"**End:** <t:{operation.date_end}>")
 
             if self.options.show_opserv_link:
                 opserv_link = f"https://www.the-bwc.com/opserv/operation.php?id={operation.operation_id}&do=view"
