@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 
+
 load_dotenv()
 
 # Discord bot token
@@ -21,5 +22,6 @@ XENFORO_DB_PASSWORD = os.getenv('XENFORO_DB_PASSWORD')
 
 # Bot settings
 OPSEC_CHANNELS_MAP = {
-    "16": "1212157407598223470"
+    "16": "844204862844829717"
 }
+BOT_DB_NAME = "botdb"
