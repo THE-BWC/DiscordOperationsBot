@@ -1,8 +1,7 @@
 import random
 import platform
 import os
-from typing import List
-
+import crontab
 import discord
 from discord.ext import tasks, commands
 
@@ -26,7 +25,7 @@ class DiscordBot(commands.Bot):
 
     def __init__(self):
         self.intents.message_content = True
-        super().__init__(command_prefix=commands.when_mentioned_or(self.command_prefix),
+        super().__init__(command_prefix=self.command_prefix,
             intents=self.intents
         )
         self.logger = bot_logger.logger
@@ -62,6 +61,13 @@ class DiscordBot(commands.Bot):
         self.notifier_upcoming = UpcomingOperationsNotifier(self, self.config, self.logger)
 
         await self.add_cog(Notifier(self))
+
+        self.add_listener(self.on_cron_changed, 'on_cron_changed')
+        self.tree.copy_global_to(guild=settings.GUILD_ID)
+        await self.tree.sync(guild=settings.GUILD_ID)
+
+    async def on_cron_changed(self, cron: crontab.CronTab):
+        bot.logger.info(f"crontab changed: {cron}")
 
 
 bot = DiscordBot()
