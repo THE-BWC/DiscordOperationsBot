@@ -1,9 +1,12 @@
+import asyncio
 import datetime
-from typing import Callable, List, Any
+from typing import List, Any
+
+import crontab
 import discord
 from discord.ext import commands, tasks
 import database
-import settings
+
 
 class OperationMessageOptions:
     """ Options to configure an OperationsEmbed instance """
@@ -30,6 +33,7 @@ NOTIFICATION_OPTIONS = {
     'UPCOMING_OPS': OperationMessageOptions(),
     '30MIN_OPS': OperationMessageOptions(show_game=False, show_date_end=False, include_timestamp=False)
 }
+
 
 class OperationsEmbed:
     embed: discord.Embed
@@ -83,31 +87,23 @@ class OperationsEmbed:
 class OperationNotifier:
     async def send_operations(self,
                               embed_title:str,
-                              conditions: Callable[[database.Operation, int], List[bool]],
-                              exclude_operations: List[int] = [],
-                              notification_options: OperationMessageOptions = NOTIFICATION_OPTIONS['UPCOMING_OPS']) -> List[
-                                                                                                                                    database.Operation] | None:
+                              channels: List[int],
+                              operations: List[database.Operation],
+                              notification_options: OperationMessageOptions = NOTIFICATION_OPTIONS['UPCOMING_OPS']
+                              ) -> List[database.Operation]:
         """
         Send operation notifications in a message with the given title.
         :returns Array of operations that were processed
         """
-        channels = self.config.OPSEC_CHANNELS_MAP
         operations_notified = []
-        for game, channel in channels.items():
+        if len(operations) == 0:
+            return operations_notified
+
+        for channel in channels:
             text_channel = await self.bot.fetch_channel(channel)
 
             if text_channel is None:
                 self.logger.error(f"Channel {text_channel} not found.")
-                return
-
-            operation_model = database.Operation
-            operations = operation_model.select().where(*conditions(operation_model, game)) \
-                .order_by(operation_model.date_start)
-
-            if len(exclude_operations) > 0:
-                operations = list(filter(lambda x: x.operation_id not in exclude_operations, operations))
-
-            if len(operations) == 0:
                 return
 
             embed = OperationsEmbed(embed_title, notification_options)
@@ -127,20 +123,43 @@ class Operation30Notifier(commands.Cog, OperationNotifier):
     async def cog_unload(self) -> None:
         self.send.stop()
 
+    def get_operations(self, game_id: int, is_opsec: bool, exclude: List[int]) -> List[database.Operation]:
+        # Mindful with boolean conditions here. We cannot use proper "pythonic" conditions like
+        # `operation_model.is_complete is False` because it doesn't translate properly in the SQL query
+        now = datetime.datetime.now()
+        now = now.replace(second=0, microsecond=0)
+        deadline = now + datetime.timedelta(minutes=30)
+
+        operation_model = database.Operation
+        return operation_model.select().where(operation_model.game_id == game_id,
+                operation_model.is_completed == False,
+                operation_model.is_opsec == is_opsec,
+                operation_model.date_start.truncate("minute") >= now,
+                operation_model.date_start.truncate("minute") <= deadline,
+                operation_model.operation_id not in exclude).order_by(operation_model.date_start)
+
     @tasks.loop(minutes=3)
     async def send(self) -> [database.Operation]:
         # Get already notified data so that we can filter those out
         notification_model = database.Notification30
-        future_ops = notification_model.select(notification_model.operation_id) \
+        notified_ops = notification_model.select(notification_model.operation_id) \
             .where(notification_model.date_start >= datetime.datetime.now())
-        future_ops_ids = list(map(lambda op: op.operation_id, future_ops))
-        operations = await super().send_operations("Operations starting in 30 minutes!",
-                                                self.where_ops_30minutes,
-                                                future_ops_ids,
-                                                NOTIFICATION_OPTIONS['30MIN_OPS'])
+        notified_ops_ids = list(map(lambda op: op.operation_id, notified_ops))
+
+        notifications_sent = []
+        for game, data in self.config.OPSEC_CHANNELS_MAP.items():
+            for access, channels in data.items():
+                # Here we are pasing the notified_ops_ids so that they are filtered from the pending notif
+                pending_notifications = self.get_operations(game, access, notified_ops_ids)
+                operations = await super().send_operations("Operations starting in 30 minutes!",
+                                                           channels=channels,
+                                                           operations=pending_notifications,
+                                                           notification_options=NOTIFICATION_OPTIONS['30MIN_OPS'])
+
+                notifications_sent.extend(operations)
 
         # Save the data of those operations we notified
-        if operations:
+        if notifications_sent:
             op_data = []
             for op in operations:
                 op_data.append({'operation_id': op.operation_id, 'date_start': op.date_start})
@@ -149,53 +168,106 @@ class Operation30Notifier(commands.Cog, OperationNotifier):
 
         return []
 
-    @staticmethod
-    def where_ops_30minutes(operation_model: database.Operation, game: int) -> List[bool]:
-        """Set of conditions that select records from the Operation model with a specific deadline"""
-        # Mindful with boolean conditions here. We cannot use proper "pythonic" conditions like
-        # `operation_model.is_complete is False` because it doesn't translate properly in the SQL query
-        now = datetime.datetime.now()
-        now = now.replace(second=0, microsecond=0)
-        deadline = now + datetime.timedelta(minutes=30)
 
-        return [operation_model.game_id == game,
-                operation_model.is_completed == False,
-                operation_model.date_start.truncate("minute") >= now,
-                operation_model.date_start.truncate("minute") <= deadline]
+class NotificationTask:
+    """ Wrap an asyncio task to have a single access point to our custom notification task id logic"""
+    game_id: int
+    is_opsec: int
+    channel: int
+    task: asyncio.Task = None
+
+    def __init__(self, game_id: int, is_opsec: int, channel: int, task: asyncio.Task):
+        self.game_id = game_id
+        self.is_opsec = is_opsec
+        self.channel = channel
+        self.task = task
+
+    def set_task(self, task):
+        if self.task is not None:
+            self.task.cancel()
+
+        self.task = task
+
+    def id(self):
+        return self.get_id(self.game_id, self.is_opsec, self.channel)
+
+    def stop(self):
+        self.task.cancel()
+
+    def __str__(self):
+        return self.id()
+
+    @staticmethod
+    def get_id(game_id: int, is_opsec: int, channel: int):
+        """ Returns the custom id format we use for tasks"""
+        return f"{game_id}-{is_opsec}-{channel}"
 
 
 class UpcomingOperationsNotifier(commands.Cog, OperationNotifier):
-    class OpservTimezone(datetime.tzinfo):
-        def utcoffset(self, __dt: datetime.datetime | None) -> datetime.timedelta | None:
-            return datetime.timedelta(hours=-5)
+    tasks: {str: asyncio.Task}
 
-        def dst(self, __dt: datetime.datetime | None) -> datetime.timedelta | None:
-            return datetime.timedelta(hours=-1)
-
-        def tzname(self, __dt: datetime.datetime | None) -> str | None:
-            return 'America/New York'
-
-    schedule = datetime.time(hour=19)
-    def __init__(self, bot, config: Any, logger):
+    def __init__(self, bot: commands.Bot, config: Any, logger):
         self.bot = bot
         self.config = config
         self.logger = logger
-        self.send.start()
+        self.tasks = {}
+        self.setup()
+
+    def create_task(self, game: int, is_opsec: int, channel: int, cron: str):
+        # This creates and starts a task at the same time
+        task = self.bot.loop.create_task(self.__send(game, is_opsec, cron, [channel]))
+        # Encapsulate it in our own class just for ease of access later
+        return NotificationTask(game, is_opsec, channel, task)
+
+    def setup(self):
+        for game, data in self.config.OPSEC_CHANNELS_MAP.items():
+            for is_opsec, channels in data.items():
+                for channel, cron in channels.items():
+                    notification_task = self.create_task(game, is_opsec, channel, cron)
+                    self.tasks[notification_task.id()] = notification_task
+
+    def stop(self):
+        for task in self.tasks.values():
+            task.stop()
+
+    async def cog_load(self) -> None:
+        self.setup()
 
     async def cog_unload(self) -> None:
-        self.send.stop()
+        self.stop()
 
-    @tasks.loop(time=datetime.time(hour=19, tzinfo=OpservTimezone()))
-    async def send(self) -> [database.Operation]:
-        await super().send_operations("OPSEC Operations", self.where_upcoming_opsec_ops)
+    def get_operations(self, game_id: int, is_opsec: bool) -> List[database.Operation]:
+        operation_model = database.Operation
+        now = datetime.datetime.now().replace(second=0, minute=0)
+        return operation_model.select().where(
+            operation_model.game_id == game_id,
+            operation_model.is_opsec == is_opsec,
+            operation_model.is_completed == False,
+            operation_model.date_start.truncate("minute") >= now
+        )
 
-        # Return empty because there's nothing that needs to be saved to the db
-        return []
+    async def __send(self, game: int, is_opsec: int, schedule: str, channels: [int]):
+        # This is the work for the task related to a single notification
+        cron = crontab.CronTab(schedule)
+        while True:
+            # sleep until next execution to avoid using cpu cycles
+            next_run = cron.next()
+            await asyncio.sleep(next_run)
 
-    @staticmethod
-    def where_upcoming_opsec_ops(operation_model: database.Operation, game: int) -> List[bool]:
-        return [
-            operation_model.game_id == game,
-            operation_model.is_opsec == True,
-            operation_model.is_completed == False
-        ]
+            ops = self.get_operations(game, is_opsec)
+            title = "OPSEC" if is_opsec == 1 else "Public"
+            await super().send_operations(f"{title} Operations", channels=channels, operations=ops)
+
+    def update_task(self, game_id: int, is_opsec: int, channel: int, cron: str):
+        """Stop any existing task with the same id and creates a new one"""
+        self.stop_task(game_id, is_opsec, channel)
+        notification_task = self.create_task(game_id, is_opsec, channel, cron)
+        self.tasks[notification_task.id()] = notification_task
+
+    def stop_task(self, game_id: int, is_opsec: int, channel: int):
+        """Stop the task that matches the id of the provided arguments"""
+        notification_id = NotificationTask.get_id(game_id, is_opsec, channel)
+        notification_task = self.tasks.get(notification_id, None)
+
+        if notification_task is not None:
+            notification_task.stop()
