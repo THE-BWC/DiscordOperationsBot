@@ -42,7 +42,7 @@ class Settings:
         if not os.path.exists(self.SETTINGS_FILENAME):
             return
 
-        with open(self.SETTINGS_FILENAME, 'r') as settings_file:
+        with open(self.SETTINGS_FILENAME) as settings_file:
             contents = json.load(settings_file)
 
         # move things to memory
@@ -50,17 +50,19 @@ class Settings:
         self.opsec_channels_map = map
 
     def save(self):
-        with open(self.SETTINGS_FILENAME, 'rw') as settings_file:
-            json_str = json.dumps(self.opsec_channels_map, indent=2)
-            settings_content = {'opsec_channels_map': json_str}
-            settings_file.write(json_str)
+        with open(self.SETTINGS_FILENAME, 'w') as settings_file:
+            settings_content = {'opsec_channels_map': self.opsec_channels_map}
+            settings_file.write(json.dumps(settings_content, indent=2))
 
     def get_channel_notifications(self, channel_id: int) -> List[Tuple[int, int, str]]:
         """Return the current notifications defined for the given channel"""
         results: List[Tuple[int, int]] = []
+
+        # because our json loads and saves with string ints, we have to work with str at this point
+        channel_id_str = str(channel_id)
         for game_id, data in self.opsec_channels_map.items():
             for is_opsec, channels in data.items():
-                results.extend([(game_id, is_opsec, cron) for channel, cron in channels.items() if channel == channel_id])
+                results.extend([(game_id, is_opsec, cron) for channel, cron in channels.items() if channel == channel_id_str])
 
         return results
 
@@ -69,19 +71,23 @@ class Settings:
         Removes the notification matching the arguments
         :returns bool - True if the entry was removed
         """
-        game_map = self.opsec_channels_map.get(game_id, None)
+        # because our json loads and saves with string ints, we have to work with str at this point
+        game_id_str = str(game_id)
+        is_opsec_str = str(is_opsec)
+        channel_id_str = str(channel_id)
+        game_map = self.opsec_channels_map.get(game_id_str, None)
         if game_map is None:
             return False
 
-        opsec_map = game_map.get(is_opsec, None)
+        opsec_map = game_map.get(is_opsec_str, None)
         if opsec_map is None:
             return False
 
-        channel = opsec_map.get(channel_id, None)
+        channel = opsec_map.get(channel_id_str, None)
         if channel is None:
             return False
 
-        del self.opsec_channels_map[game_id][is_opsec][channel_id]
+        del self.opsec_channels_map[game_id_str][is_opsec_str][channel_id_str]
         self.save()
         return True
 
@@ -90,26 +96,30 @@ class Settings:
         Update or add a new entry in the channels map
         :returns int - 1 if it's new 0 if it's an old entry
         """
+        # because our json loads and saves with string ints, we have to work with str at this point
+        game_id_str = str(game_id)
+        is_opsec_str = str(is_opsec)
+        channel_id_str = str(channel_id)
         is_new = 1
-        game_map = self.opsec_channels_map.get(game_id, None)
+        game_map = self.opsec_channels_map.get(game_id_str, None)
         if game_map is None:
             game_map = {}
 
-        opsec_map = game_map.get(is_opsec, None)
+        opsec_map = game_map.get(is_opsec_str, None)
 
         if opsec_map is None:
             opsec_map = {}
-            game_map[is_opsec] = opsec_map
+            game_map[is_opsec_str] = opsec_map
 
-        channel = opsec_map.get(channel_id, None)
+        channel = opsec_map.get(channel_id_str, None)
 
         if channel is None:
-            game_map[is_opsec] = {channel_id: cron_str}
+            game_map[is_opsec_str] = {channel_id_str: cron_str}
         else:
-            game_map[is_opsec][channel_id] = cron_str
+            game_map[is_opsec_str][channel_id_str] = cron_str
             # since the channel exist we need to update this
             is_new = 0
 
-        self.opsec_channels_map[game_id] = game_map
+        self.opsec_channels_map[game_id_str] = game_map
         self.save()
         return is_new

@@ -57,6 +57,10 @@ class Notifier(commands.Cog):
     @app_commands.command(description="Display current notifications in this channel")
     async def notification_list(self, interaction: discord.Interaction):
         notifications = self.config.get_channel_notifications(interaction.channel_id)
+        if not notifications:
+            await interaction.response.send_message("There are no notifications in this channel")
+            return
+
         pretty_notifications = [(game_id, "OPSEC" if is_opsec == 1 else "PUBLIC", cron_descriptor.get_description(cron)) for game_id, is_opsec, cron in notifications]
         message_lines = [f"Game: {game_id} - {opsec}, {cron_str}" for game_id, opsec, cron_str in pretty_notifications]
         await interaction.response.send_message("\n".join(message_lines))
