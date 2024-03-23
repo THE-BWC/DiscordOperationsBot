@@ -1,6 +1,5 @@
 import json
 import os
-from typing import Tuple, List
 from dotenv import load_dotenv
 
 
@@ -35,34 +34,36 @@ class Settings:
 
     opsec_channels_map: {int: {int: {int: str}}} = {}
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.load()
 
-    def load(self):
+    def load(self) -> None:
         if not os.path.exists(self.SETTINGS_FILENAME):
             return
 
-        with open(self.SETTINGS_FILENAME) as settings_file:
+        with open(self.SETTINGS_FILENAME, encoding='utf-8') as settings_file:
             contents = json.load(settings_file)
 
         # move things to memory
-        map = contents.get('opsec_channels_map', {})
-        self.opsec_channels_map = map
+        channels_map = contents.get('opsec_channels_map', {})
+        self.opsec_channels_map = channels_map
 
-    def save(self):
-        with open(self.SETTINGS_FILENAME, 'w') as settings_file:
+    def save(self) -> None:
+        with open(self.SETTINGS_FILENAME, 'w', encoding='utf-8') as settings_file:
             settings_content = {'opsec_channels_map': self.opsec_channels_map}
             settings_file.write(json.dumps(settings_content, indent=2))
 
-    def get_channel_notifications(self, channel_id: int) -> List[Tuple[int, int, str]]:
+    def get_channel_notifications(self, channel_id: int) -> list[tuple[int, int, str]]:
         """Return the current notifications defined for the given channel"""
-        results: List[Tuple[int, int]] = []
+        results: list[tuple[int, int, str]] = []
 
         # because our json loads and saves with string ints, we have to work with str at this point
         channel_id_str = str(channel_id)
         for game_id, data in self.opsec_channels_map.items():
             for is_opsec, channels in data.items():
-                results.extend([(game_id, is_opsec, cron) for channel, cron in channels.items() if channel == channel_id_str])
+                results.extend(
+                    [(game_id, is_opsec, cron) for channel, cron in channels.items() if channel == channel_id_str]
+                )
 
         return results
 

@@ -10,7 +10,7 @@ import settings
 import bot_logger
 import database
 
-from Cogs.notifier_command import Notifier
+from Cogs.notifier_command import Notifier, CronChangedEventArgs, CronRemovedEventArgs
 from Cogs.operation_notification import Operation30Notifier, UpcomingOperationsNotifier
 
 if settings.DISCORD_BOT_TOKEN is None:
@@ -24,7 +24,7 @@ class DiscordBot(commands.Bot):
     intents = discord.Intents.default()
     command_prefix = '!'
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.intents.message_content = True
         super().__init__(command_prefix=self.command_prefix,
             intents=self.intents
@@ -73,26 +73,26 @@ class DiscordBot(commands.Bot):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
 
-    async def on_cron_removed(self, interaction: discord.Interaction, game_id: int, is_opsec: int, channel_id: int):
+    async def on_cron_removed(self, interaction: discord.Interaction, args: CronRemovedEventArgs) -> None:
         """Event callback used to modify the settings object to remove cron entries"""
-        opsec_text = "OPSEC" if is_opsec else "PUBLIC"
-        if not self.settings.remove_notification(game_id, is_opsec, channel_id):
-            await interaction.response.send_message(f"Could not find {opsec_text} notification for game {game_id}")
+        opsec_text = "OPSEC" if args.is_opsec else "PUBLIC"
+        if not self.settings.remove_notification(args.game_id, args.is_opsec, args.channel_id):
+            await interaction.response.send_message(f"Could not find {opsec_text} notification for game {args.game_id}")
             return
 
-        self.notifier_upcoming.stop_task(game_id, is_opsec, channel_id)
-        await interaction.response.send_message(f"{opsec_text} notification removed for game {game_id}")
+        self.notifier_upcoming.stop_task(args.game_id, args.is_opsec, args.channel_id)
+        await interaction.response.send_message(f"{opsec_text} notification removed for game {args.game_id}")
 
-    async def on_cron_changed(self, interaction: discord.Interaction, game_id: int, is_opsec: int, channel_id: int, cron_str: str):
+    async def on_cron_changed(self, interaction: discord.Interaction, args: CronChangedEventArgs) -> None:
         """Event callback used to modify the settings object to add or update cron entries"""
         # Because here we will need a mix of both the crontab object AND the string, we should get the string instead
         # of the cron object and just recreate it
-        is_new = self.settings.update_notification(game_id, is_opsec, channel_id, cron_str)
-        self.notifier_upcoming.update_task(game_id, is_opsec, channel_id, cron_str)
+        is_new = self.settings.update_notification(args.game_id, args.is_opsec, args.channel_id, args.cron)
+        self.notifier_upcoming.update_task(args.game_id, args.is_opsec, args.channel_id, args.cron)
 
-        opsec_text = "OPSEC" if is_opsec else "PUBLIC"
+        opsec_text = "OPSEC" if args.is_opsec else "PUBLIC"
         msg = f"Added {opsec_text} notification" if is_new == 1 else f"Updated {opsec_text} notification"
-        cron_text = cron_descriptor.get_description(cron_str)
+        cron_text = cron_descriptor.get_description(args.cron)
         await interaction.response.send_message(f"{msg}: {cron_text}")
 
 

@@ -1,6 +1,6 @@
 import asyncio
 import datetime
-from typing import List, Any
+from logging import Logger
 
 import crontab
 import discord
@@ -50,7 +50,7 @@ class OperationsEmbed:
 
         self.options = notification_options
 
-    async def send_operations(self, text_channel: discord.TextChannel, operations) -> None:
+    async def send_operations(self, text_channel: discord.TextChannel, operations: list[database.Operation]) -> None:
         if self.options.include_timestamp:
             # Get current timestamp
             # TODO: Should this be opserv time to make this consistent?
@@ -86,12 +86,14 @@ class OperationsEmbed:
 
 
 class OperationNotifier:
+    bot: commands.Bot
+    logger: Logger
     async def send_operations(self,
                               embed_title:str,
-                              channels: List[int],
-                              operations: List[database.Operation],
+                              channels: list[int],
+                              operations: list[database.Operation],
                               notification_options: OperationMessageOptions = NOTIFICATION_OPTIONS['UPCOMING_OPS']
-                              ) -> List[database.Operation]:
+                              ) -> list[database.Operation]:
         """
         Send operation notifications in a message with the given title.
         :returns Array of operations that were processed
@@ -105,7 +107,7 @@ class OperationNotifier:
 
             if text_channel is None:
                 self.logger.error(f"Channel {text_channel} not found.")
-                return
+                continue
 
             embed = OperationsEmbed(embed_title, notification_options)
             await embed.send_operations(text_channel, operations)
@@ -115,7 +117,7 @@ class OperationNotifier:
 
 
 class Operation30Notifier(commands.Cog, OperationNotifier):
-    def __init__(self, bot, config: Settings, logger):
+    def __init__(self, bot: commands.Bot, config: Settings, logger: Logger) -> None:
         self.bot = bot
         self.config = config
         self.logger = logger
@@ -124,7 +126,7 @@ class Operation30Notifier(commands.Cog, OperationNotifier):
     async def cog_unload(self) -> None:
         self.send.stop()
 
-    def get_operations(self, game_id: int, is_opsec: bool, exclude: List[int]) -> List[database.Operation]:
+    def get_operations(self, game_id: int, is_opsec: bool, exclude: list[int]) -> list[database.Operation]:
         # Mindful with boolean conditions here. We cannot use proper "pythonic" conditions like
         # `operation_model.is_complete is False` because it doesn't translate properly in the SQL query
         now = datetime.datetime.now()
@@ -177,29 +179,29 @@ class NotificationTask:
     channel: int
     task: asyncio.Task = None
 
-    def __init__(self, game_id: int, is_opsec: int, channel: int, task: asyncio.Task):
+    def __init__(self, game_id: int, is_opsec: int, channel: int, task: asyncio.Task) -> None:
         self.game_id = game_id
         self.is_opsec = is_opsec
         self.channel = channel
         self.task = task
 
-    def set_task(self, task):
+    def set_task(self, task) -> None:
         if self.task is not None:
             self.task.cancel()
 
         self.task = task
 
-    def id(self):
+    def id(self) -> str:
         return self.get_id(self.game_id, self.is_opsec, self.channel)
 
-    def stop(self):
+    def stop(self) -> None:
         self.task.cancel()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.id()
 
     @staticmethod
-    def get_id(game_id: int, is_opsec: int, channel: int):
+    def get_id(game_id: int, is_opsec: int, channel: int) -> str:
         """ Returns the custom id format we use for tasks"""
         return f"{game_id}-{is_opsec}-{channel}"
 
@@ -207,27 +209,27 @@ class NotificationTask:
 class UpcomingOperationsNotifier(commands.Cog, OperationNotifier):
     tasks: {str: asyncio.Task}
 
-    def __init__(self, bot: commands.Bot, config: Settings, logger):
+    def __init__(self, bot: commands.Bot, config: Settings, logger: Logger) -> None:
         self.bot = bot
         self.config = config
         self.logger = logger
         self.tasks = {}
         self.setup()
 
-    def create_task(self, game: int, is_opsec: int, channel: int, cron: str):
+    def create_task(self, game: int, is_opsec: int, channel: int, cron: str) -> NotificationTask:
         # This creates and starts a task at the same time
         task = self.bot.loop.create_task(self.__send(game, is_opsec, cron, [channel]))
         # Encapsulate it in our own class just for ease of access later
         return NotificationTask(game, is_opsec, channel, task)
 
-    def setup(self):
+    def setup(self) -> None:
         for game, data in self.config.opsec_channels_map.items():
             for is_opsec, channels in data.items():
                 for channel, cron in channels.items():
                     notification_task = self.create_task(game, is_opsec, channel, cron)
                     self.tasks[notification_task.id()] = notification_task
 
-    def stop(self):
+    def stop(self) -> None:
         for task in self.tasks.values():
             task.stop()
 
@@ -237,7 +239,7 @@ class UpcomingOperationsNotifier(commands.Cog, OperationNotifier):
     async def cog_unload(self) -> None:
         self.stop()
 
-    def get_operations(self, game_id: int, is_opsec: bool) -> List[database.Operation]:
+    def get_operations(self, game_id: int, is_opsec: bool) -> list[database.Operation]:
         operation_model = database.Operation
         now = datetime.datetime.now().replace(second=0, minute=0)
         return operation_model.select().where(
@@ -247,7 +249,7 @@ class UpcomingOperationsNotifier(commands.Cog, OperationNotifier):
             operation_model.date_start.truncate("minute") >= now
         )
 
-    async def __send(self, game: int, is_opsec: int, schedule: str, channels: [int]):
+    async def __send(self, game: int, is_opsec: int, schedule: str, channels: [int]) -> None:
         # This is the work for the task related to a single notification
         cron = crontab.CronTab(schedule)
         while True:
@@ -259,13 +261,13 @@ class UpcomingOperationsNotifier(commands.Cog, OperationNotifier):
             title = "OPSEC" if is_opsec == self.config.OPSEC else "Public"
             await super().send_operations(f"{title} Operations", channels=channels, operations=ops)
 
-    def update_task(self, game_id: int, is_opsec: int, channel: int, cron: str):
+    def update_task(self, game_id: int, is_opsec: int, channel: int, cron: str) -> None:
         """Stop any existing task with the same id and creates a new one"""
         self.stop_task(game_id, is_opsec, channel)
         notification_task = self.create_task(game_id, is_opsec, channel, cron)
         self.tasks[notification_task.id()] = notification_task
 
-    def stop_task(self, game_id: int, is_opsec: int, channel: int):
+    def stop_task(self, game_id: int, is_opsec: int, channel: int) -> None:
         """Stop the task that matches the id of the provided arguments"""
         notification_id = NotificationTask.get_id(game_id, is_opsec, channel)
         notification_task = self.tasks.get(notification_id, None)
