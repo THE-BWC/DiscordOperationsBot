@@ -1,7 +1,5 @@
 import os
 from typing import Tuple, List
-
-import crontab
 from dotenv import load_dotenv
 
 
@@ -25,9 +23,12 @@ XENFORO_DB_PASSWORD = os.getenv('XENFORO_DB_PASSWORD')
 
 # Bot settings
 GUILD_ID = 0
-OPSEC_CHANNELS_MAP = {
-    "16": "844204862844829717"
-}
+BOT_DB_NAME = "botdb"
+
+# Game/channels map data.
+OPSEC = 1
+PUBLIC = 0
+OPSEC_CHANNELS_MAP = {}
 
 
 def get_channel_notifications(channel_id: int) -> List[Tuple[int, int, str]]:
