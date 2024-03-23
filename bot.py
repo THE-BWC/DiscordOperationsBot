@@ -1,31 +1,37 @@
-import collections
-import datetime
 import random
 import platform
 import os
-from typing import List
 
+import cron_descriptor
 import discord
-from discord.ext import tasks
+from discord.ext import tasks, commands
 
 import settings
-import notification_settings
 import bot_logger
 import database
 
-from operation_message import OperationMessageOptions, OperationsEmbed
+from Cogs.notifier_command import Notifier, CronChangedEventArgs, CronRemovedEventArgs
+from Cogs.operation_notification import Operation30Notifier, UpcomingOperationsNotifier
 
 if settings.DISCORD_BOT_TOKEN is None:
     raise ValueError("DISCORD_BOT_TOKEN is not set in the environment variables.")
 
 
-class DiscordBot(discord.Client):
+class DiscordBot(commands.Bot):
+    notifier_30: Operation30Notifier
+    notifier_upcoming: UpcomingOperationsNotifier
+
+    intents = discord.Intents.default()
+    command_prefix = '!'
+
     def __init__(self) -> None:
-        super().__init__(
-            intents=discord.Intents.default()
+        self.intents.message_content = True
+        super().__init__(command_prefix=self.command_prefix,
+            intents=self.intents
         )
         self.logger = bot_logger.logger
         self.config = settings
+        self.settings = settings.Settings()
         self.database = None
 
     @tasks.loop(minutes=1.0)
@@ -50,92 +56,44 @@ class DiscordBot(discord.Client):
         self.logger.info("Running on %s", f"{platform.system()} {platform.release()} ({os.name})")
         self.logger.info("-------------------")
         self.status_task.start()
-        self.send_30minutes_notification_task.start()
         self.database = database
-        await self.send_upcoming_ops()
 
-    async def send_upcoming_ops(self) -> None:
-        await self.send_operations("OPSEC Operations", self.where_upcoming_opsec_ops)
+        # Create notifiers
+        self.notifier_30 = Operation30Notifier(self, self.settings, self.logger)
+        self.notifier_upcoming = UpcomingOperationsNotifier(self, self.settings, self.logger)
 
-    @staticmethod
-    def where_upcoming_opsec_ops(operation_model: database.Operation, game: int) -> list[bool]:
-        return [
-            operation_model.game_id == game,
-            operation_model.is_opsec == True,
-            operation_model.is_completed == False
-        ]
+        # Setup commands
+        notifier_command = Notifier(self, self.settings)
+        await self.add_cog(notifier_command)
+        notifier_command.on_cron_changed += self.on_cron_changed
+        notifier_command.on_cron_removed += self.on_cron_removed
 
-    @tasks.loop(minutes=3)
-    async def send_30minutes_notification_task(self) -> None:
-        # Get already notified data so that we can filter those out
-        notification_model = database.Notification30
-        future_ops = notification_model.select(notification_model.operation_id) \
-            .where(notification_model.date_start >= datetime.datetime.now())
-        future_ops_ids = list(map(lambda op: op.operation_id, future_ops))
-        operations = await self.send_operations("Operations starting in 30 minutes!",
-                                                self.where_ops_30minutes,
-                                                future_ops_ids,
-                                                notification_settings.NOTIFICATION_OPTIONS['30MIN_OPS'])
+        # Trigger sync to update slash commands
+        guild = discord.Object(id=settings.GUILD_ID)
+        self.tree.copy_global_to(guild=guild)
+        await self.tree.sync(guild=guild)
 
-        # Save the data of those operations we notified
-        if operations:
-            op_data = []
-            for op in operations:
-                op_data.append({'operation_id': op.operation_id, 'date_start': op.date_start})
+    async def on_cron_removed(self, interaction: discord.Interaction, args: CronRemovedEventArgs) -> None:
+        """Event callback used to modify the settings object to remove cron entries"""
+        opsec_text = "OPSEC" if args.is_opsec else "PUBLIC"
+        if not self.settings.remove_notification(args.game_id, args.is_opsec, args.channel_id):
+            await interaction.response.send_message(f"Could not find {opsec_text} notification for game {args.game_id}")
+            return
 
-            with self.database.bot.atomic():
-                notification_model.insert_many(op_data).execute(self.database.bot)
+        self.notifier_upcoming.stop_task(args.game_id, args.is_opsec, args.channel_id)
+        await interaction.response.send_message(f"{opsec_text} notification removed for game {args.game_id}")
 
-    @staticmethod
-    def where_ops_30minutes(operation_model: database.Operation, game: int) -> list[bool]:
-        """Set of conditions that select records from the Operation model with a specific deadline"""
-        # Mindful with boolean conditions here. We cannot use proper "pythonic" conditions like
-        # `operation_model.is_complete is False` because it doesn't translate properly in the SQL query
-        now = datetime.datetime.now()
-        now = now.replace(second=0, microsecond=0)
-        deadline = now + datetime.timedelta(minutes=30)
+    async def on_cron_changed(self, interaction: discord.Interaction, args: CronChangedEventArgs) -> None:
+        """Event callback used to modify the settings object to add or update cron entries"""
+        # Because here we will need a mix of both the crontab object AND the string, we should get the string instead
+        # of the cron object and just recreate it
+        is_new = self.settings.update_notification(args.game_id, args.is_opsec, args.channel_id, args.cron)
+        self.notifier_upcoming.update_task(args.game_id, args.is_opsec, args.channel_id, args.cron)
 
-        return [operation_model.game_id == game,
-                operation_model.is_completed == False,
-                operation_model.date_start.truncate("minute") >= now,
-                operation_model.date_start.truncate("minute") <= deadline]
-
-    async def send_operations(
-            self,
-            embed_title: str,
-            conditions: collections.abc.Callable[[database.Operation, int], list[bool]],
-            exclude_operations: list[int] = [],
-            notification_options: OperationMessageOptions =
-            notification_settings.NOTIFICATION_OPTIONS['UPCOMING_OPS']
-    ) -> List[database.Operation] | None:
-        """
-        Send operation notifications in a message with the given title.
-        :returns Array of operations that were processed
-        """
-        channels = self.config.OPSEC_CHANNELS_MAP
-        operations_notified = []
-        for game, channel in channels.items():
-            text_channel = await self.fetch_channel(channel)
-
-            if text_channel is None:
-                self.logger.error("Channel %s not found.", text_channel)
-                return
-
-            operation_model = database.Operation
-            operations = operation_model.select().where(*conditions(operation_model, game)) \
-                .order_by(operation_model.date_start)
-
-            if len(exclude_operations) > 0:
-                operations = list(filter(lambda x: x.operation_id not in exclude_operations, operations))
-
-            if len(operations) == 0:
-                return
-
-            embed = OperationsEmbed(embed_title, notification_options)
-            await embed.send_operations(text_channel, operations)
-            operations_notified.extend(operations)
-
-        return operations_notified
+        opsec_text = "OPSEC" if args.is_opsec else "PUBLIC"
+        msg = f"Added {opsec_text} notification" if is_new == 1 else f"Updated {opsec_text} notification"
+        cron_text = cron_descriptor.get_description(args.cron)
+        await interaction.response.send_message(f"{msg}: {cron_text}")
 
 
 bot = DiscordBot()
