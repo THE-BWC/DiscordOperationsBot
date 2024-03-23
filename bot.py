@@ -31,6 +31,7 @@ class DiscordBot(commands.Bot):
         )
         self.logger = bot_logger.logger
         self.config = settings
+        self.settings = settings.Settings()
         self.database = None
 
     @tasks.loop(minutes=1.0)
@@ -58,11 +59,11 @@ class DiscordBot(commands.Bot):
         self.database = database
 
         # Create notifiers
-        self.notifier_30 = Operation30Notifier(self, self.config, self.logger)
-        self.notifier_upcoming = UpcomingOperationsNotifier(self, self.config, self.logger)
+        self.notifier_30 = Operation30Notifier(self, self.settings, self.logger)
+        self.notifier_upcoming = UpcomingOperationsNotifier(self, self.settings, self.logger)
 
         # Setup commands
-        notifier_command = Notifier(self, self.config)
+        notifier_command = Notifier(self, self.settings)
         await self.add_cog(notifier_command)
         notifier_command.on_cron_changed += self.on_cron_changed
         notifier_command.on_cron_removed += self.on_cron_removed
@@ -75,7 +76,7 @@ class DiscordBot(commands.Bot):
     async def on_cron_removed(self, interaction: discord.Interaction, game_id: int, is_opsec: int, channel_id: int):
         """Event callback used to modify the settings object to remove cron entries"""
         opsec_text = "OPSEC" if is_opsec else "PUBLIC"
-        if not self.config.remove_notification(game_id, is_opsec, channel_id):
+        if not self.settings.remove_notification(game_id, is_opsec, channel_id):
             await interaction.response.send_message(f"Could not find {opsec_text} notification for game {game_id}")
             return
 
@@ -86,7 +87,7 @@ class DiscordBot(commands.Bot):
         """Event callback used to modify the settings object to add or update cron entries"""
         # Because here we will need a mix of both the crontab object AND the string, we should get the string instead
         # of the cron object and just recreate it
-        is_new = self.config.update_notification(game_id, is_opsec, channel_id, cron_str)
+        is_new = self.settings.update_notification(game_id, is_opsec, channel_id, cron_str)
         self.notifier_upcoming.update_task(game_id, is_opsec, channel_id, cron_str)
 
         opsec_text = "OPSEC" if is_opsec else "PUBLIC"

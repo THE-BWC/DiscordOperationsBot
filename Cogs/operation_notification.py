@@ -6,6 +6,7 @@ import crontab
 import discord
 from discord.ext import commands, tasks
 import database
+from settings import Settings
 
 
 class OperationMessageOptions:
@@ -114,7 +115,7 @@ class OperationNotifier:
 
 
 class Operation30Notifier(commands.Cog, OperationNotifier):
-    def __init__(self, bot, config: Any, logger):
+    def __init__(self, bot, config: Settings, logger):
         self.bot = bot
         self.config = config
         self.logger = logger
@@ -147,7 +148,7 @@ class Operation30Notifier(commands.Cog, OperationNotifier):
         notified_ops_ids = list(map(lambda op: op.operation_id, notified_ops))
 
         notifications_sent = []
-        for game, data in self.config.OPSEC_CHANNELS_MAP.items():
+        for game, data in self.config.opsec_channels_map.items():
             for access, channels in data.items():
                 # Here we are pasing the notified_ops_ids so that they are filtered from the pending notif
                 pending_notifications = self.get_operations(game, access, notified_ops_ids)
@@ -206,7 +207,7 @@ class NotificationTask:
 class UpcomingOperationsNotifier(commands.Cog, OperationNotifier):
     tasks: {str: asyncio.Task}
 
-    def __init__(self, bot: commands.Bot, config: Any, logger):
+    def __init__(self, bot: commands.Bot, config: Settings, logger):
         self.bot = bot
         self.config = config
         self.logger = logger
@@ -220,7 +221,7 @@ class UpcomingOperationsNotifier(commands.Cog, OperationNotifier):
         return NotificationTask(game, is_opsec, channel, task)
 
     def setup(self):
-        for game, data in self.config.OPSEC_CHANNELS_MAP.items():
+        for game, data in self.config.opsec_channels_map.items():
             for is_opsec, channels in data.items():
                 for channel, cron in channels.items():
                     notification_task = self.create_task(game, is_opsec, channel, cron)

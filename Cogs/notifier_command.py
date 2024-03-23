@@ -6,6 +6,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from settings import Settings
+
 
 class Event:
     """Base event class"""
@@ -44,7 +46,7 @@ class Notifier(commands.Cog):
     on_cron_changed: CronChangedEvent
     on_cron_removed: CronRemovedEvent
 
-    def __init__(self, bot: commands.Bot, config):
+    def __init__(self, bot: commands.Bot, config: Settings):
         self.bot = bot
         self.config = config
         # Use these events to setting modifications from within this class, and instead leave that to the one
