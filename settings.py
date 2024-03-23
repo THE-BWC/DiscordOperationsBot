@@ -29,8 +29,8 @@ BOT_DB_NAME = "botdb"
 
 class Settings:
     # Game/channels map data.
-    OPSEC = 1
-    PUBLIC = 0
+    OPSEC = '1'
+    PUBLIC = '0'
     SETTINGS_FILENAME = "settings.json"
 
     opsec_channels_map: {int: {int: {int: str}}} = {}
@@ -100,6 +100,7 @@ class Settings:
         game_id_str = str(game_id)
         is_opsec_str = str(is_opsec)
         channel_id_str = str(channel_id)
+
         is_new = 1
         game_map = self.opsec_channels_map.get(game_id_str, None)
         if game_map is None:
@@ -112,13 +113,11 @@ class Settings:
             game_map[is_opsec_str] = opsec_map
 
         channel = opsec_map.get(channel_id_str, None)
-
-        if channel is None:
-            game_map[is_opsec_str] = {channel_id_str: cron_str}
-        else:
-            game_map[is_opsec_str][channel_id_str] = cron_str
+        if channel is not None:
             # since the channel exist we need to update this
             is_new = 0
+
+        game_map[is_opsec_str][channel_id_str] = cron_str
 
         self.opsec_channels_map[game_id_str] = game_map
         self.save()

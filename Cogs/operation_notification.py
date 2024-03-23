@@ -256,7 +256,7 @@ class UpcomingOperationsNotifier(commands.Cog, OperationNotifier):
             await asyncio.sleep(next_run)
 
             ops = self.get_operations(game, is_opsec)
-            title = "OPSEC" if is_opsec == 1 else "Public"
+            title = "OPSEC" if is_opsec == self.config.OPSEC else "Public"
             await super().send_operations(f"{title} Operations", channels=channels, operations=ops)
 
     def update_task(self, game_id: int, is_opsec: int, channel: int, cron: str):
