@@ -185,7 +185,7 @@ class NotificationTask:
         self.channel = channel
         self.task = task
 
-    def set_task(self, task) -> None:
+    def set_task(self, task: asyncio.Task) -> None:
         if self.task is not None:
             self.task.cancel()
 
