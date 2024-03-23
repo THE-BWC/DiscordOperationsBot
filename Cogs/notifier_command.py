@@ -32,14 +32,14 @@ class Event:
 
 
 class CronChangedEventArgs:
-    game_id: int
-    channel_id: int
-    is_opsec: int
-    cron: str
+    game_id: int = 0
+    channel_id: int = 0
+    is_opsec: int = 0
+    cron: str = ""
 
     def __init__(self, **kwargs) -> None:
         for k, v in kwargs.items():
-            if getattr(self, k):
+            if hasattr(self, k):
                 setattr(self, k, v)
 
 
@@ -51,13 +51,13 @@ class CronChangedEvent(Event):
 
 
 class CronRemovedEventArgs:
-    game_id: int
-    channel_id: int
-    is_opsec: int
+    game_id: int = 0
+    channel_id: int = 0
+    is_opsec: int = 0
 
     def __init__(self, **kwargs) -> None:
         for k, v in kwargs.items():
-            if getattr(self, k):
+            if hasattr(self, k):
                 setattr(self, k, v)
 
 
