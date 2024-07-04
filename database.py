@@ -6,7 +6,7 @@ import settings
 xenforo = MySQLDatabase(
     settings.XENFORO_DB_NAME,
     user=settings.XENFORO_DB_USER,
-    password=settings.XENFORO_DB_PASSWORD,
+    password=settings.XENFORO_DB_PASS,
     host=settings.XENFORO_DB_HOST,
     port=int(settings.XENFORO_DB_PORT)
 )
