@@ -243,3 +243,8 @@ cython_debug/
 
 # Docker
 docker-compose.yaml
+
+# Ruff
+ruff-report.json
+# Docker
+docker-compose.yaml
