@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  bot:
+    image: ghcr.io/the-bwc/discord_operations_bot:latest
+    restart: unless-stopped
+    environment:
+      DISCORD_BOT_TOKEN:
+      XENFORO_DB_HOST:
+      XENFORO_DB_PORT:
+      XENFORO_DB_NAME:
+      XENFORO_DB_USER:
+      XENFORO_DB_PASS:

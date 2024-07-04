@@ -1,0 +1,4 @@
+# Contains all base dependencies for the bot
+discord.py~=2.3
+PyMySQL~=1.1
+peewee~=3.17
