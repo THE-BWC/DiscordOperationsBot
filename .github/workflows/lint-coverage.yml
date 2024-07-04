@@ -22,6 +22,7 @@ jobs:
               - "/**"
 
   lint:
+    needs: get-changed-files
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
