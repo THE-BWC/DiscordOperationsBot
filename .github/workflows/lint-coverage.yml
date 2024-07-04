@@ -34,7 +34,7 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
       - name: Lint
-        run: ruff check --fix -o ruff-report --output-format json
+        run: ruff check --fix -o ruff-report.json --output-format json
       - name: Upload Lint Report
         uses: actions/upload-artifact@v4
         with:
