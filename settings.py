@@ -1,25 +1,26 @@
 import json
 import os
 
-if 'DEVELOPMENT' in os.environ:
+if "DEVELOPMENT" in os.environ:
     from dotenv import load_dotenv
+
     load_dotenv()
 
 # Discord bot token
-DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
 # Statuses
 STATUS = ["the operations"]
 
 # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # Database
-XENFORO_DB_HOST = os.getenv('XENFORO_DB_HOST')
-XENFORO_DB_PORT = os.getenv('XENFORO_DB_PORT')
-XENFORO_DB_NAME = os.getenv('XENFORO_DB_NAME')
-XENFORO_DB_USER = os.getenv('XENFORO_DB_USER')
-XENFORO_DB_PASS = os.getenv('XENFORO_DB_PASS')
+XENFORO_DB_HOST = os.getenv("XENFORO_DB_HOST")
+XENFORO_DB_PORT = os.getenv("XENFORO_DB_PORT")
+XENFORO_DB_NAME = os.getenv("XENFORO_DB_NAME")
+XENFORO_DB_USER = os.getenv("XENFORO_DB_USER")
+XENFORO_DB_PASS = os.getenv("XENFORO_DB_PASS")
 
 # Bot settings
 GUILD_ID = 0
@@ -28,8 +29,8 @@ BOT_DB_NAME = "botdb"
 
 class Settings:
     # Game/channels map data.
-    OPSEC = '1'
-    PUBLIC = '0'
+    OPSEC = "1"
+    PUBLIC = "0"
     SETTINGS_FILENAME = "settings.json"
 
     opsec_channels_map: {int: {int: {int: str}}} = {}
@@ -41,16 +42,16 @@ class Settings:
         if not os.path.exists(self.SETTINGS_FILENAME):
             return
 
-        with open(self.SETTINGS_FILENAME, encoding='utf-8') as settings_file:
+        with open(self.SETTINGS_FILENAME, encoding="utf-8") as settings_file:
             contents = json.load(settings_file)
 
         # move things to memory
-        channels_map = contents.get('opsec_channels_map', {})
+        channels_map = contents.get("opsec_channels_map", {})
         self.opsec_channels_map = channels_map
 
     def save(self) -> None:
-        with open(self.SETTINGS_FILENAME, 'w', encoding='utf-8') as settings_file:
-            settings_content = {'opsec_channels_map': self.opsec_channels_map}
+        with open(self.SETTINGS_FILENAME, "w", encoding="utf-8") as settings_file:
+            settings_content = {"opsec_channels_map": self.opsec_channels_map}
             settings_file.write(json.dumps(settings_content, indent=2))
 
     def get_channel_notifications(self, channel_id: int) -> list[tuple[int, int, str]]:
@@ -62,7 +63,11 @@ class Settings:
         for game_id, data in self.opsec_channels_map.items():
             for is_opsec, channels in data.items():
                 results.extend(
-                    [(game_id, is_opsec, cron) for channel, cron in channels.items() if channel == channel_id_str]
+                    [
+                        (game_id, is_opsec, cron)
+                        for channel, cron in channels.items()
+                        if channel == channel_id_str
+                    ]
                 )
 
         return results
@@ -92,7 +97,9 @@ class Settings:
         self.save()
         return True
 
-    def update_notification(self, game_id: int, is_opsec: int, channel_id: int, cron_str: str) -> int:
+    def update_notification(
+        self, game_id: int, is_opsec: int, channel_id: int, cron_str: str
+    ) -> int:
         """
         Update or add a new entry in the channels map
         :returns int - 1 if it's new 0 if it's an old entry
