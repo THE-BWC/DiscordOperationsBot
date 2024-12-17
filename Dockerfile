@@ -1,9 +1,11 @@
 FROM python:3
 
 WORKDIR /app
-COPY requirements.txt ./
-COPY /requirements/ ./requirements/
-RUN pip install -r requirements.txt
+COPY pyproject.toml .
+COPY poetry.lock .
+RUN pip install poetry
+RUN poetry config virtualenvs.create false
+RUN poetry install --no-dev
 
 COPY . .
 
