@@ -11,6 +11,7 @@ from settings import Settings
 
 class Event:
     """Base event class"""
+
     callbacks: [Callable]
 
     def __init__(self) -> None:
@@ -44,8 +45,17 @@ class CronChangedEventArgs:
 
 
 class CronChangedEvent(Event):
-    async def trigger(self, interaction: discord.Interaction, game_id: int, is_opsec: int, channel_id: int, cron: str) -> None:
-        args = CronChangedEventArgs(game_id=game_id, channel_id=channel_id, is_opsec=is_opsec, cron=cron)
+    async def trigger(
+        self,
+        interaction: discord.Interaction,
+        game_id: int,
+        is_opsec: int,
+        channel_id: int,
+        cron: str,
+    ) -> None:
+        args = CronChangedEventArgs(
+            game_id=game_id, channel_id=channel_id, is_opsec=is_opsec, cron=cron
+        )
         for callback in self.callbacks:
             await callback(interaction, args)
 
@@ -62,8 +72,16 @@ class CronRemovedEventArgs:
 
 
 class CronRemovedEvent(Event):
-    async def trigger(self, interaction: discord.Interaction, game_id: int, is_opsec: int, channel_id: int) -> None:
-        args = CronRemovedEventArgs(game_id=game_id, is_opsec=is_opsec, channel_id=channel_id)
+    async def trigger(
+        self,
+        interaction: discord.Interaction,
+        game_id: int,
+        is_opsec: int,
+        channel_id: int,
+    ) -> None:
+        args = CronRemovedEventArgs(
+            game_id=game_id, is_opsec=is_opsec, channel_id=channel_id
+        )
         for callback in self.callbacks:
             await callback(interaction, args)
 
@@ -84,36 +102,58 @@ class Notifier(commands.Cog):
     async def notification_list(self, interaction: discord.Interaction) -> None:
         notifications = self.config.get_channel_notifications(interaction.channel_id)
         if not notifications:
-            await interaction.response.send_message("There are no notifications in this channel")
+            await interaction.response.send_message(
+                "There are no notifications in this channel"
+            )
             return
 
         pretty_notifications = [
             (
                 game_id,
                 "OPSEC" if is_opsec == self.config.OPSEC else "PUBLIC",
-                cron_descriptor.get_description(cron)
-             ) for game_id, is_opsec, cron in notifications
+                cron_descriptor.get_description(cron),
+            )
+            for game_id, is_opsec, cron in notifications
         ]
-        message_lines = [f"Game: {game_id} - {opsec}: {cron_str}" for game_id, opsec, cron_str in pretty_notifications]
+        message_lines = [
+            f"Game: {game_id} - {opsec}: {cron_str}"
+            for game_id, opsec, cron_str in pretty_notifications
+        ]
         message = "\n".join(message_lines)
         await interaction.response.send_message(message)
 
-    @app_commands.command(description="Remove the notification with the provided arguments from this channel")
-    async def notification_remove(self, interaction:discord.Interaction, game_id: int, is_opsec: bool) -> None:
+    @app_commands.command(
+        description="Remove the notification with the provided arguments from this channel"
+    )
+    async def notification_remove(
+        self, interaction: discord.Interaction, game_id: int, is_opsec: bool
+    ) -> None:
         if not await self.validate_game_id(interaction, game_id):
             return
 
-        await self.on_cron_removed.trigger(interaction, game_id, int(is_opsec), interaction.channel_id)
+        await self.on_cron_removed.trigger(
+            interaction, game_id, int(is_opsec), interaction.channel_id
+        )
 
-    @app_commands.command(description="Add or update a notification in this channel. Google `cron` for help on valid values.")
-    async def notification(self, interaction: discord.Interaction, game_id: int, is_opsec: bool, cron_str: str) -> None:
+    @app_commands.command(
+        description="Add or update a notification in this channel. Google `cron` for help on valid values."
+    )
+    async def notification(
+        self,
+        interaction: discord.Interaction,
+        game_id: int,
+        is_opsec: bool,
+        cron_str: str,
+    ) -> None:
         if not await self.validate_game_id(interaction, game_id):
             return
 
         try:
             # Validate our cron string here instead of failing down the pipeline
             crontab.CronTab(cron_str)
-            await self.on_cron_changed.trigger(interaction, game_id, int(is_opsec), interaction.channel_id, cron_str)
+            await self.on_cron_changed.trigger(
+                interaction, game_id, int(is_opsec), interaction.channel_id, cron_str
+            )
         except ValueError as e:
             await interaction.response.send_message(f"""
 Invalid cron string: {e}. Valid `cron` strings can be as follows:
@@ -125,7 +165,9 @@ Invalid cron string: {e}. Valid `cron` strings can be as follows:
 ```
 For more information, Google is your friend""")
 
-    async def validate_game_id(self, interaction: discord.Interaction, game_id: int) -> bool:
+    async def validate_game_id(
+        self, interaction: discord.Interaction, game_id: int
+    ) -> bool:
         if game_id == 0:
             await interaction.response.send_message("The provided game id is not valid")
             return False

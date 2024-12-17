@@ -1,0 +1,20 @@
+exclude: ""
+default_language_version:
+  python: python3
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: trailing-whitespace
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.1
+    hooks:
+      - id: ruff
+        args: ['--fix']
+      - id: ruff-format
+        # This may be redundant if prior ruff-format stops the action.
+        # But if it doesn't then this will if there are any files that need to be formatted.
+      - id: ruff-format
+        args: ['--check']
+        always_run: true

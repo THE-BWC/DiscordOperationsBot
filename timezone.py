@@ -9,4 +9,4 @@ class OpservTimezone(datetime.tzinfo):
         return datetime.timedelta(hours=-1)
 
     def tzname(self, __dt: datetime.datetime | None) -> str | None:
-        return 'America/New York'
+        return "America/New York"

@@ -22,13 +22,11 @@ class DiscordBot(commands.Bot):
     notifier_upcoming: UpcomingOperationsNotifier
 
     intents = discord.Intents.default()
-    command_prefix = '!'
+    command_prefix = "!"
 
     def __init__(self) -> None:
         self.intents.message_content = True
-        super().__init__(command_prefix=self.command_prefix,
-            intents=self.intents
-        )
+        super().__init__(command_prefix=self.command_prefix, intents=self.intents)
         self.logger = bot_logger.logger
         self.config = settings
         self.settings = settings.Settings()
@@ -40,9 +38,8 @@ class DiscordBot(commands.Bot):
         await self.change_presence(
             status=discord.Status.online,
             activity=discord.Activity(
-                type=discord.ActivityType.watching,
-                name=random.choice(statuses)
-            )
+                type=discord.ActivityType.watching, name=random.choice(statuses)
+            ),
         )
 
     @status_task.before_loop
@@ -52,15 +49,22 @@ class DiscordBot(commands.Bot):
     async def setup_hook(self) -> None:
         self.logger.info("Logged in as %s", self.user.name)
         self.logger.info("discord.py version: %s", discord.__version__)
-        self.logger.info("Python version: %s", f"{platform.python_version()} ({platform.architecture()[0]})")
-        self.logger.info("Running on %s", f"{platform.system()} {platform.release()} ({os.name})")
+        self.logger.info(
+            "Python version: %s",
+            f"{platform.python_version()} ({platform.architecture()[0]})",
+        )
+        self.logger.info(
+            "Running on %s", f"{platform.system()} {platform.release()} ({os.name})"
+        )
         self.logger.info("-------------------")
         self.status_task.start()
         self.database = database
 
         # Create notifiers
         self.notifier_30 = Operation30Notifier(self, self.settings, self.logger)
-        self.notifier_upcoming = UpcomingOperationsNotifier(self, self.settings, self.logger)
+        self.notifier_upcoming = UpcomingOperationsNotifier(
+            self, self.settings, self.logger
+        )
 
         # Setup commands
         notifier_command = Notifier(self, self.settings)
@@ -73,25 +77,43 @@ class DiscordBot(commands.Bot):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
 
-    async def on_cron_removed(self, interaction: discord.Interaction, args: CronRemovedEventArgs) -> None:
+    async def on_cron_removed(
+        self, interaction: discord.Interaction, args: CronRemovedEventArgs
+    ) -> None:
         """Event callback used to modify the settings object to remove cron entries"""
         opsec_text = "OPSEC" if args.is_opsec else "PUBLIC"
-        if not self.settings.remove_notification(args.game_id, args.is_opsec, args.channel_id):
-            await interaction.response.send_message(f"Could not find {opsec_text} notification for game {args.game_id}")
+        if not self.settings.remove_notification(
+            args.game_id, args.is_opsec, args.channel_id
+        ):
+            await interaction.response.send_message(
+                f"Could not find {opsec_text} notification for game {args.game_id}"
+            )
             return
 
         self.notifier_upcoming.stop_task(args.game_id, args.is_opsec, args.channel_id)
-        await interaction.response.send_message(f"{opsec_text} notification removed for game {args.game_id}")
+        await interaction.response.send_message(
+            f"{opsec_text} notification removed for game {args.game_id}"
+        )
 
-    async def on_cron_changed(self, interaction: discord.Interaction, args: CronChangedEventArgs) -> None:
+    async def on_cron_changed(
+        self, interaction: discord.Interaction, args: CronChangedEventArgs
+    ) -> None:
         """Event callback used to modify the settings object to add or update cron entries"""
         # Because here we will need a mix of both the crontab object AND the string, we should get the string instead
         # of the cron object and just recreate it
-        is_new = self.settings.update_notification(args.game_id, args.is_opsec, args.channel_id, args.cron)
-        self.notifier_upcoming.update_task(args.game_id, args.is_opsec, args.channel_id, args.cron)
+        is_new = self.settings.update_notification(
+            args.game_id, args.is_opsec, args.channel_id, args.cron
+        )
+        self.notifier_upcoming.update_task(
+            args.game_id, args.is_opsec, args.channel_id, args.cron
+        )
 
         opsec_text = "OPSEC" if args.is_opsec else "PUBLIC"
-        msg = f"Added {opsec_text} notification" if is_new == 1 else f"Updated {opsec_text} notification"
+        msg = (
+            f"Added {opsec_text} notification"
+            if is_new == 1
+            else f"Updated {opsec_text} notification"
+        )
         cron_text = cron_descriptor.get_description(args.cron)
         await interaction.response.send_message(f"{msg}: {cron_text}")
 

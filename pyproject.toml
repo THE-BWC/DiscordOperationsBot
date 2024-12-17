@@ -1,3 +1,39 @@
-# https://docs.astral.sh/ruff/settings
-[tool.ruff.lint.extend-per-file-ignores]
-"bot.py" = ["E712"]
+[tool.ruff]
+exclude = [".venv"]
+lint.extend-per-file-ignores = { "bot.py" = ["E712"], "Cogs/operation_notification.py" = ["E712"] }
+
+[tool.poetry]
+name = "discordoperationsbot"
+version = "0.1.0"
+description = "Black Widow Company Discord Operations Bot"
+authors = [
+    "Patrick Pedersen <github@patrickpedersen.tech>",
+    "Black Widow Company <S-1@the-bwc.com>"
+]
+repository = "https://github.com/the-bwc/DiscordOperationsBot"
+license = "MIT"
+readme = ["README", "LICENSE"]
+keywords = ["discord", "bot", "operations", "blackwidowcompany"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+discord-py = "^2.4.0"
+peewee = "^3.17.8"
+pymysql = "^1.1.1"
+sentry-sdk = "^2.19.2"
+
+[tool.poetry.group.dev.dependencies]
+python-dotenv = "^1.0.1"
+pytest-cov = "^6.0.0"
+ruff = "^0.8.3"
+pre-commit = "^4.0.1"
+taskipy = "^1.14.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.taskipy.tasks]
+lint = "pre-commit run --all-files"
+pre-commit = "pre-commit install"

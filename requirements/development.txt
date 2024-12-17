@@ -1,3 +1,0 @@
--r base.txt
-# Contains all development only dependencies for the bot
-python-dotenv~=1.0
