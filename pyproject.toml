@@ -1,6 +1,10 @@
 [tool.ruff]
 exclude = [".venv"]
-lint.extend-per-file-ignores = { "bot.py" = ["E712"], "Cogs/operation_notification.py" = ["E712"] }
+
+[tool.ruff.lint.extend-per-file-ignores]
+"bot.py" = ["E712"]
+"cogs/operation_notification.py" = ["E712"]
+"cogs/scheduled_events.py" = ["E712"]
 
 [tool.poetry]
 name = "discordoperationsbot"
@@ -22,6 +26,12 @@ discord-py = "^2.4.0"
 peewee = "^3.17.8"
 pymysql = "^1.1.1"
 sentry-sdk = "^2.19.2"
+cron-descriptor = "^1.4.5"
+crontab = "^1.0.1"
+click = "^8.1.7"
+watchdog = "^6.0.0"
+html2text = "^2024.2.26"
+python-dateutil = "^2.9.0.post0"
 
 [tool.poetry.group.dev.dependencies]
 python-dotenv = "^1.0.1"

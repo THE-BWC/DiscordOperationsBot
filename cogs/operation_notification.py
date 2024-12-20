@@ -5,7 +5,7 @@ from logging import Logger
 import crontab
 import discord
 from discord.ext import commands, tasks
-import database
+from database import Operation, Notification30
 from settings import Settings
 
 
@@ -54,7 +54,7 @@ class OperationsEmbed:
         self.options = notification_options
 
     async def send_operations(
-        self, text_channel: discord.TextChannel, operations: list[database.Operation]
+        self, text_channel: discord.TextChannel, operations: list[Operation]
     ) -> None:
         if self.options.include_timestamp:
             # Get current timestamp
@@ -96,11 +96,11 @@ class OperationNotifier:
         self,
         embed_title: str,
         channels: list[int],
-        operations: list[database.Operation],
+        operations: list[Operation],
         notification_options: OperationMessageOptions = NOTIFICATION_OPTIONS[
             "UPCOMING_OPS"
         ],
-    ) -> list[database.Operation]:
+    ) -> list[Operation]:
         """
         Send operation notifications in a message with the given title.
         :returns Array of operations that were processed
@@ -135,14 +135,14 @@ class Operation30Notifier(commands.Cog, OperationNotifier):
 
     def get_operations(
         self, game_id: int, is_opsec: bool, exclude: list[int]
-    ) -> list[database.Operation]:
+    ) -> list[Operation]:
         # Mindful with boolean conditions here. We cannot use proper "pythonic" conditions like
         # `operation_model.is_complete is False` because it doesn't translate properly in the SQL query
         now = datetime.datetime.now()
         now = now.replace(second=0, microsecond=0)
         deadline = now + datetime.timedelta(minutes=30)
 
-        operation_model = database.Operation
+        operation_model = Operation
         return (
             operation_model.select()
             .where(
@@ -157,9 +157,9 @@ class Operation30Notifier(commands.Cog, OperationNotifier):
         )
 
     @tasks.loop(minutes=3)
-    async def send(self) -> [database.Operation]:
+    async def send(self) -> [Operation]:
         # Get already notified data so that we can filter those out
-        notification_model = database.Notification30
+        notification_model = Notification30
         notified_ops = notification_model.select(notification_model.operation_id).where(
             notification_model.date_start >= datetime.datetime.now()
         )
@@ -168,7 +168,7 @@ class Operation30Notifier(commands.Cog, OperationNotifier):
         notifications_sent = []
         for game, data in self.config.opsec_channels_map.items():
             for access, channels in data.items():
-                # Here we are pasing the notified_ops_ids so that they are filtered from the pending notif
+                # Here we are passing the notified_ops_ids so that they are filtered from the pending notif
                 pending_notifications = self.get_operations(
                     game, access, notified_ops_ids
                 )
@@ -266,8 +266,8 @@ class UpcomingOperationsNotifier(commands.Cog, OperationNotifier):
     async def cog_unload(self) -> None:
         self.stop()
 
-    def get_operations(self, game_id: int, is_opsec: bool) -> list[database.Operation]:
-        operation_model = database.Operation
+    def get_operations(self, game_id: int, is_opsec: bool) -> list[Operation]:
+        operation_model = Operation
         now = datetime.datetime.now().replace(second=0, minute=0)
         return operation_model.select().where(
             operation_model.game_id == game_id,

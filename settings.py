@@ -1,13 +1,54 @@
 import json
 import os
 
-if "DEVELOPMENT" in os.environ:
+if os.environ.get("BOT_ENV") == "development":
     from dotenv import load_dotenv
 
     load_dotenv()
 
 # Discord bot token
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+if not DISCORD_BOT_TOKEN:
+    raise ValueError("DISCORD_BOT_TOKEN is not set")
+
+# Xenforo Database
+XENFORO_DB_HOST = os.getenv("XENFORO_DB_HOST")
+XENFORO_DB_PORT = os.getenv("XENFORO_DB_PORT")
+XENFORO_DB_NAME = os.getenv("XENFORO_DB_NAME")
+XENFORO_DB_USER = os.getenv("XENFORO_DB_USER")
+XENFORO_DB_PASS = os.getenv("XENFORO_DB_PASS")
+if (
+    not XENFORO_DB_HOST
+    or not XENFORO_DB_PORT
+    or not XENFORO_DB_NAME
+    or not XENFORO_DB_USER
+    or not XENFORO_DB_PASS
+):
+    raise ValueError("Xenforo database settings are not set")
+
+# Bot Database
+BOT_DB_HOST = os.getenv("BOT_DB_HOST")
+BOT_DB_PORT = os.getenv("BOT_DB_PORT")
+BOT_DB_NAME = os.getenv("BOT_DB_NAME")
+BOT_DB_USER = os.getenv("BOT_DB_USER")
+BOT_DB_PASS = os.getenv("BOT_DB_PASS")
+if (
+    not BOT_DB_HOST
+    or not BOT_DB_PORT
+    or not BOT_DB_NAME
+    or not BOT_DB_USER
+    or not BOT_DB_PASS
+):
+    raise ValueError("Bot database settings are not set")
+
+# Bot settings
+GUILD_ID = int(os.getenv("GUILD_ID"))
+if not GUILD_ID:
+    raise ValueError("GUILD_ID is not set")
+
+DISCORD_CLIENT_ID = int(os.getenv("DISCORD_CLIENT_ID"))
+if not DISCORD_CLIENT_ID:
+    raise ValueError("DISCORD_CLIENT_ID is not set")
 
 # Statuses
 STATUS = ["the operations"]
@@ -15,16 +56,14 @@ STATUS = ["the operations"]
 # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-# Database
-XENFORO_DB_HOST = os.getenv("XENFORO_DB_HOST")
-XENFORO_DB_PORT = os.getenv("XENFORO_DB_PORT")
-XENFORO_DB_NAME = os.getenv("XENFORO_DB_NAME")
-XENFORO_DB_USER = os.getenv("XENFORO_DB_USER")
-XENFORO_DB_PASS = os.getenv("XENFORO_DB_PASS")
-
-# Bot settings
-GUILD_ID = 0
-BOT_DB_NAME = "botdb"
+# Sentry DSN
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+ENVIRONMENT = os.getenv("BOT_ENV", "production")
+if ENVIRONMENT == "development":
+    RELEASE = "development"
+else:
+    # TODO: Needs to be auto-incremented for each release
+    RELEASE = os.getenv("RELEASE", "0.1.0")
 
 
 class Settings:
